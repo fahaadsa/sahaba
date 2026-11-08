@@ -349,7 +349,7 @@ footer a{color:var(--acc);text-decoration:none}
     <footer>
       الرادار: <a href="https://www.rainviewer.com" target="_blank" rel="noopener">Weather data by RainViewer</a> · آخر ساعتين، كل ١٠ دقائق<br>
       السحب: <a href="https://view.eumetsat.int" target="_blank" rel="noopener">© EUMETSAT</a> · التوقعات: <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a><br>
-      الخريطة: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
+      الخريطة: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener">© CARTO</a>
     </footer>
   </main>
 </div>
@@ -435,16 +435,20 @@ const dark = window.matchMedia("(prefers-color-scheme: dark)");
 const map = L.map("map", { zoomControl:false, attributionControl:true, maxZoom:11, minZoom:3, worldCopyJump:true }).setView([24.71, 46.67], 6);
 map.attributionControl.setPrefix(false);
 // Optional: a free CARTO key (carto.com/basemaps/apikey) gives nicer light/dark maps. Empty = OpenStreetMap (no key needed).
-const CARTO_KEY = "";
-let base = null;
+const CARTO_KEY = "cb1_54lv_1_ce62a80c167c72913172c535";
+let base = null, cartoFailed = false;
 function setBase(){
   if(base) map.removeLayer(base);
   const el = document.getElementById("map");
-  if(CARTO_KEY){
+  if(CARTO_KEY && !cartoFailed){
     el.classList.remove("osm-dark");
-    base = L.tileLayer("https://{s}.basemaps.cartocdn.com/" + (dark.matches ? "dark_all" : "rastertiles/voyager") + "/{z}/{x}/{y}{r}.png?key=" + encodeURIComponent(CARTO_KEY), {
-      subdomains:"abcd", maxZoom:19, className:"base-tiles", attribution:"© OpenStreetMap © CARTO"
+    base = L.tileLayer("https://basemaps.cartocdn.com/rastertiles/" + (dark.matches ? "dark_all" : "voyager") + "/{z}/{x}/{y}.png?key=" + encodeURIComponent(CARTO_KEY), {
+      maxZoom:19, className:"base-tiles", attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank">CARTO</a>'
     });
+    // if the key is refused (e.g. opened outside the allowed site), fall back to OpenStreetMap
+    let ok = 0, bad = 0;
+    base.on("tileload", () => ok++);
+    base.on("tileerror", () => { if(++bad >= 4 && !ok && !cartoFailed){ cartoFailed = true; setBase(); } });
   }else{
     el.classList.toggle("osm-dark", dark.matches);
     base = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -693,15 +697,29 @@ async function reverseName(lat, lon){
     const j = await r.json(); return j.city || j.locality || j.principalSubdivision || "موقعي";
   }catch(e){ return "موقعي"; }
 }
-$("#locBtn").onclick = () => {
-  if(!navigator.geolocation){ toast("المتصفح لا يدعم تحديد الموقع"); return; }
+// fly: move the map; silent: no message on failure (used on page load)
+let lastLocate = 0;
+function locateMe(fly, silent){
+  if(!navigator.geolocation){ if(!silent) toast("المتصفح لا يدعم تحديد الموقع"); return; }
   const b = $("#locBtn"); b.classList.add("on");
   navigator.geolocation.getCurrentPosition(async pos => {
     const lat = +pos.coords.latitude.toFixed(4), lon = +pos.coords.longitude.toFixed(4);
-    setPlace({ name: await reverseName(lat, lon), lat, lon }, true);
-  }, () => { b.classList.remove("on"); toast("لم يُسمح بالموقع — ابحث عن مدينتك"); },
-  { enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
-};
+    lastLocate = Date.now();
+    setPlace({ name: await reverseName(lat, lon), lat, lon }, fly);
+  }, () => { b.classList.remove("on"); if(!silent) toast("لم يُسمح بالموقع — ابحث عن مدينتك"); },
+  { enableHighAccuracy:false, timeout:12000, maximumAge:600000 });
+}
+$("#locBtn").onclick = () => locateMe(true, false);
+async function autoLocate(){
+  // ask for the visitor's location on every visit, unless they already refused it
+  try{
+    if(navigator.permissions){
+      const st = await navigator.permissions.query({ name:"geolocation" });
+      if(st.state === "denied") return;
+    }
+  }catch(e){}
+  locateMe(true, true);
+}
 
 let qTimer = null;
 $("#q").addEventListener("input", e => {
@@ -938,6 +956,16 @@ const GI = {
 function showSheet(){
   const steps = $("#steps"), warn = $("#sheetWarn");
   let list = [], w = "";
+  if(inApp && isAndroid){
+    const url = location.href.replace(/^https?:\/\//, "");
+    steps.innerHTML = "";
+    $("#sheetSub").textContent = "التثبيت يحتاج متصفح كروم";
+    warn.textContent = ""; warn.style.display = "none";
+    $("#sheetBg").classList.add("show");
+    $("#sheetOk").textContent = "فتح في كروم";
+    $("#sheetOk").onclick = () => { location.href = "intent://" + url + "#Intent;scheme=https;package=com.android.chrome;end"; };
+    return;
+  }
   if(inApp){
     list = ["اضغط " + GI.dots + " أو " + GI.more + " في أعلى الصفحة", "اختر «فتح في المتصفح» (سفاري أو كروم)", "من هناك اضغط زر التثبيت مرة ثانية"];
     $("#sheetSub").textContent = "افتح الرابط في المتصفح أولاً";
@@ -1007,6 +1035,13 @@ loadVisitors();
 renderFavs();
 setPlace(place, false);
 map.setView([place.lat, place.lon], 6);
+autoLocate();
+document.addEventListener("visibilitychange", async () => {
+  if(document.hidden || Date.now() - lastLocate < 15 * 60000) return;
+  try{
+    if(navigator.permissions && (await navigator.permissions.query({ name:"geolocation" })).state === "granted") locateMe(false, true);
+  }catch(e){}
+});
 loadRadar();
 })();
 </script>
