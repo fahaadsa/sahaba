@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="سحابة">
+<meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1522" media="(prefers-color-scheme: dark)">
+<title>سحابة</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Cpath d='M19 36h26a8.5 8.5 0 0 0 1-16.9A12 12 0 0 0 23.6 21 8 8 0 0 0 19 36z' fill='%23fff'/%3E%3Cpath d='M22 42s-3 4-3 6a3 3 0 0 0 6 0c0-2-3-6-3-6zM32 45s-3 4-3 6a3 3 0 0 0 6 0c0-2-3-6-3-6zM42 42s-3 4-3 6a3 3 0 0 0 6 0c0-2-3-6-3-6z' fill='%23bfdbfe'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f7fb;--card:#ffffff;--soft:#eef3f9;--line:#e3e9f2;--txt:#0f172a;--mut:#64748b;
+  --acc:#2563eb;--acc-soft:#dbeafe;--rain:#3b82f6;--sun:#f59e0b;--cloud:#94a3b8;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 4px 16px rgba(15,23,42,.06);
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0f1522;--card:#171f30;--soft:#1f293d;--line:#26314a;--txt:#e6ecf7;--mut:#93a1bb;
+    --acc:#60a5fa;--acc-soft:#1e3a66;--rain:#60a5fa;--cloud:#7d8aa3;
+    --shadow:0 1px 2px rgba(0,0,0,.2),0 4px 16px rgba(0,0,0,.25)}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"IBM Plex Sans Arabic",system-ui,sans-serif}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+svg{display:block}
+.wrap{max-width:720px;margin:0 auto;padding:0 max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left))}
+
+/* ---------- header ---------- */
+header{padding:calc(var(--safe-t) + 14px) 0 10px}
+.bar{display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;flex-direction:column;align-items:center;line-height:1}
+.brand h1{margin:0;font-size:28px;font-weight:700;letter-spacing:0;color:var(--txt)}
+.brand .drops{margin-top:5px}
+.actions{display:flex;gap:8px;align-items:center}
+.visits{display:flex;align-items:center;gap:7px;height:40px;padding:0 13px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);font-size:13px;color:var(--mut);white-space:nowrap}
+.visits[hidden]{display:none}
+.visits svg{color:var(--acc)}
+.visits b{font-size:17px;font-weight:700;color:var(--txt);font-variant-numeric:tabular-nums}
+.hbtn{width:40px;height:40px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center;color:var(--mut)}
+.hbtn:active{transform:scale(.96)}
+.hbtn.spin svg{animation:spin .8s linear}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.search{position:relative;margin-top:12px}
+.search input{width:100%;height:46px;background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:14px;
+  padding:0 42px 0 14px;font:inherit;font-size:16px;outline:none;box-shadow:var(--shadow);-webkit-appearance:none}
+.search input:focus{border-color:var(--acc)}
+.search .si{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--mut);pointer-events:none}
+.results{position:absolute;top:calc(100% + 6px);inset-inline:0;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;overflow:hidden;display:none;box-shadow:0 12px 32px rgba(15,23,42,.15);z-index:1200}
+.results div{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
+.results div:last-child{border:0}
+.results div:active,.results div:hover{background:var(--soft)}
+.results small{color:var(--mut)}
+.results .rh{font-size:12px;color:var(--mut);cursor:default;padding:10px 14px 6px;border:0}
+.results .rh:hover{background:none}
+.results .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.results .rk{color:var(--mut);font-size:12px;width:18px;text-align:center;flex:none}
+.results .nm{flex:1;font-weight:500}
+.results .cnt{min-width:38px;padding:3px 10px;border-radius:999px;background:var(--acc-soft);color:var(--acc);font-weight:700;font-size:13px;text-align:center;font-variant-numeric:tabular-nums}
+
+/* ---------- cards ---------- */
+main{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:6px 0 calc(var(--safe-b) + 28px)}
+.card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:16px}
+.card h3{margin:0 0 12px;font-size:14px;color:var(--mut);font-weight:500}
+
+/* ---------- map card ---------- */
+.mapcard{padding:0;overflow:hidden}
+.mapbox{position:relative;height:52vh;min-height:320px;max-height:560px}
+#map{position:absolute;inset:0;background:var(--soft)}
+.base-tiles.osm{filter:saturate(.5) brightness(1.03)}
+.osm-dark .base-tiles.osm{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.4)}
+.leaflet-container{font-family:inherit;background:var(--soft)}
+.leaflet-control-attribution{font-size:9px;background:rgba(255,255,255,.7)!important;color:#475569!important;border-radius:6px 0 0 0}
+.leaflet-control-attribution a{color:#1d4ed8!important}
+
+/* layers – top right */
+.layers{position:absolute;top:12px;right:12px;z-index:500;display:flex;background:var(--card);border-radius:12px;padding:3px;box-shadow:var(--shadow);gap:2px}
+.layers button{height:34px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:500;color:var(--mut);display:flex;align-items:center;gap:5px}
+.layers button.on{background:#2563eb;color:#fff}
+
+/* map controls – left side, vertical */
+.mctl{position:absolute;left:12px;top:12px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.mgroup{background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.mgroup button{width:40px;height:40px;display:grid;place-items:center;color:var(--txt)}
+.mgroup button + button{border-top:1px solid var(--line)}
+.mgroup button:active{background:var(--soft)}
+.mgroup button.on{color:var(--acc)}
+
+.fc-img{filter:blur(7px)}
+.me-dot{width:16px;height:16px;border-radius:50%;background:var(--acc);border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25)}
+
+/* player – under the map, never overlaps */
+.player{padding:12px 14px 14px;display:grid;gap:10px;border-top:1px solid var(--line)}
+.prow{display:flex;align-items:center;gap:12px}
+.play{width:42px;height:42px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;flex:none}
+.play:active{transform:scale(.95)}
+.pmid{flex:1;min-width:0}
+.ptime{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.ptime b{font-size:15px;font-weight:600}
+.ptime span{font-size:12px;color:var(--mut)}
+.ptime.fut b,.ptime.fut span{color:#d97706}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;direction:ltr;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--line) var(--split,100%),rgba(245,158,11,.55) var(--split,100%))}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--line) var(--split,100%),rgba(245,158,11,.55) var(--split,100%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--acc);margin-top:-7px;border:3px solid var(--card);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--acc);border:3px solid var(--card)}
+.prow2{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut)}
+.legend{display:flex;align-items:center;gap:6px}
+.legend i{display:block;width:clamp(44px,18vw,96px);height:6px;border-radius:3px;
+  background:linear-gradient(270deg,#88ddee,#0099cc,#005588,#ffee00,#ff8800,#d40000,#ff66ff)}
+.opac{display:flex;align-items:center;gap:6px}
+.opac input{width:clamp(56px,18vw,84px)}
+
+/* ---------- alert ---------- */
+.alert{border-radius:16px;padding:13px 16px;font-size:14.5px;font-weight:500;display:flex;gap:10px;align-items:center;line-height:1.6}
+.alert .ai{flex:none}
+.alert.rain{background:#2563eb;color:#fff}
+.alert.dry{background:var(--card);box-shadow:var(--shadow);color:var(--txt)}
+.alert.dry .ai{color:#16a34a}
+
+/* ---------- now ---------- */
+.place{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.place b{font-size:17px;font-weight:600}
+.star{color:var(--mut);width:34px;height:34px;display:grid;place-items:center;border-radius:10px}
+.star.on{color:var(--sun)}
+.now{display:flex;align-items:center;justify-content:space-between}
+.now .t{font-size:56px;font-weight:600;line-height:1.05}
+.now .d{color:var(--mut);font-size:14px}
+.now .big{width:84px;height:84px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.stat{background:var(--soft);border-radius:14px;padding:9px 4px;text-align:center}
+.stat small{display:block;color:var(--mut);font-size:11px;margin-bottom:2px}
+.stat b{font-size:15px;font-weight:600}
+
+/* ---------- nowcast ---------- */
+.nowcast{display:flex;align-items:flex-end;gap:6px;height:96px}
+.nc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:5px}
+.nc .b{width:100%;max-width:28px;background:var(--rain);border-radius:7px 7px 3px 3px;min-height:4px}
+.nc .b.zero{background:var(--line)}
+.nc small{font-size:10.5px;color:var(--mut);white-space:nowrap}
+.nc .v{color:var(--rain);font-weight:600}
+
+/* ---------- hours ---------- */
+.hours{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -4px;padding:0 4px}
+.hours::-webkit-scrollbar{display:none}
+.h{flex:none;width:60px;border-radius:14px;padding:10px 4px;text-align:center;background:var(--soft)}
+.h.cur{background:var(--acc-soft)}
+.h small{display:block;color:var(--mut);font-size:11px}
+.h .e{width:28px;height:28px;margin:6px auto}
+.h b{font-size:15px;font-weight:600}
+.h .p{color:var(--rain);font-size:11px;min-height:15px;margin-top:2px}
+
+/* ---------- days ---------- */
+.dr{display:grid;grid-template-columns:64px 28px 1fr 46px;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.dr:last-child{border:0;padding-bottom:0}
+.dr:first-child{padding-top:0}
+.dr .e{width:26px;height:26px}
+.rngw{display:flex;align-items:center;gap:8px}
+.rngw small{color:var(--mut);width:24px;text-align:center}
+.rngw b{width:24px;text-align:center;font-weight:600}
+.rng{flex:1;height:5px;border-radius:3px;background:var(--soft);position:relative;direction:ltr}
+.rng i{position:absolute;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#60a5fa,#f59e0b)}
+.pp{color:var(--rain);font-size:12px;text-align:left;line-height:1.3}
+
+/* ---------- favourites ---------- */
+.favs{display:flex;gap:8px;flex-wrap:wrap}
+.fav{background:var(--soft);border-radius:999px;padding:7px 8px 7px 14px;font-size:13.5px;display:flex;gap:8px;align-items:center;cursor:pointer}
+.fav .x{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:var(--mut);font-size:12px}
+.muted{color:var(--mut);font-size:13px}
+
+footer{color:var(--mut);font-size:11.5px;line-height:1.8;text-align:center;padding:0 10px}
+footer a{color:var(--acc);text-decoration:none}
+
+/* ---------- tablets & large screens ---------- */
+@media (min-width:740px){
+  .wrap{max-width:880px}
+  .mapbox{max-height:640px}
+}
+@media (min-width:1100px), (min-width:900px) and (orientation:landscape){
+  .wrap{max-width:1240px;padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+  header .bar{gap:16px}
+  main{grid-template-columns:minmax(0,1.45fr) minmax(340px,1fr);align-items:start;gap:16px}
+  main > *{grid-column:2}
+  .mapcard{grid-column:1;grid-row:1 / span 6;align-self:start;position:sticky;top:14px}
+  .mapbox{height:calc(100vh - 250px);height:calc(100dvh - 250px);min-height:420px;max-height:none}
+  footer{grid-column:1 / -1}
+}
+@media (max-height:500px) and (orientation:landscape){
+  .mapbox{height:78vh;min-height:260px}
+}
+.toast{position:fixed;bottom:calc(var(--safe-b) + 18px);left:50%;transform:translateX(-50%) translateY(10px);background:#0f172a;color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="bar">
+      <div class="brand">
+        <h1>سحابة</h1>
+        <svg class="drops" width="46" height="12" viewBox="0 0 46 12" aria-hidden="true">
+          <path d="M8 1s-3.4 4.3-3.4 6.6a3.4 3.4 0 0 0 6.8 0C11.4 5.3 8 1 8 1z" fill="#93c5fd"/>
+          <path d="M23 3s-3.4 4.1-3.4 6.2a3.4 3.4 0 0 0 6.8 0C26.4 7.1 23 3 23 3z" fill="#3b82f6"/>
+          <path d="M38 1s-3.4 4.3-3.4 6.6a3.4 3.4 0 0 0 6.8 0C41.4 5.3 38 1 38 1z" fill="#93c5fd"/>
+        </svg>
+      </div>
+      <div class="actions">
+      <div class="visits" id="visits" hidden title="عدد الزوار">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        <b id="visitsN">—</b><span>زائر</span>
+      </div>
+      <button class="hbtn" id="refBtn" aria-label="تحديث">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+      </button>
+      </div>
+    </div>
+    <div class="search">
+      <svg class="si" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="ابحث عن مدينة" autocomplete="off" enterkeyhint="search">
+      <div class="results" id="results"></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- map -->
+    <section class="card mapcard">
+      <div class="mapbox">
+        <div id="map" dir="ltr"></div>
+
+        <div class="layers" role="group" aria-label="الطبقات">
+          <button class="on" data-l="radar">رادار</button>
+          <button data-l="clouds">سحب</button>
+          <button data-l="coverage">التغطية</button>
+        </div>
+
+        <div class="mctl">
+          <div class="mgroup">
+            <button id="zIn" aria-label="تكبير"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button id="zOut" aria-label="تصغير"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+          </div>
+          <div class="mgroup">
+            <button id="locBtn" aria-label="موقعي"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="player">
+        <div class="prow">
+          <button class="play" id="play" aria-label="تشغيل">
+            <svg id="playIc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>
+          </button>
+          <div class="pmid">
+            <div class="ptime"><b id="tlTime">جارٍ التحميل…</b><span id="tlAgo"></span></div>
+            <input type="range" id="slider" min="0" max="0" value="0" aria-label="الوقت">
+          </div>
+        </div>
+        <div class="prow2">
+          <div class="legend"><span>خفيف</span><i></i><span>غزير</span></div>
+          <div class="opac"><span>الوضوح</span><input type="range" id="opacity" min="20" max="100" value="80" aria-label="الوضوح"></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="alertBox" class="alert dry"><span class="ai"></span><span class="at">جارٍ فحص المطر…</span></div>
+
+    <section class="card">
+      <div class="place"><b id="placeName">—</b>
+        <button class="star" id="star" aria-label="المفضلة"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg></button>
+      </div>
+      <div class="now">
+        <div>
+          <div class="t" id="nowT">--°</div>
+          <div class="d" id="nowD">—</div>
+        </div>
+        <div class="big" id="nowIc"></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><small>الإحساس</small><b id="sFeel">-</b></div>
+        <div class="stat"><small>الرطوبة</small><b id="sHum">-</b></div>
+        <div class="stat"><small>الرياح كم/س</small><b id="sWind">-</b></div>
+        <div class="stat"><small>الغيوم</small><b id="sCloud">-</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>المطر خلال الساعتين القادمتين</h3>
+      <div class="nowcast" id="nowcast"></div>
+    </section>
+
+    <section class="card">
+      <h3>الساعات القادمة</h3>
+      <div class="hours" id="hours"></div>
+    </section>
+
+    <section class="card">
+      <h3>الأيام القادمة</h3>
+      <div id="days"></div>
+    </section>
+
+    <section class="card">
+      <h3>المفضلة</h3>
+      <div class="favs" id="favs"></div>
+    </section>
+
+    <footer>
+      الرادار: <a href="https://www.rainviewer.com" target="_blank" rel="noopener">Weather data by RainViewer</a> · آخر ساعتين، كل ١٠ دقائق<br>
+      السحب: <a href="https://view.eumetsat.int" target="_blank" rel="noopener">© EUMETSAT</a> · التوقعات: <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a><br>
+      الخريطة: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>
+    </footer>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); }
+const arNum = n => String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+function fmtClock(date, short){
+  let h = date.getHours(), m = date.getMinutes(); const ap = h < 12 ? "ص" : "م"; h = h % 12 || 12;
+  return short ? arNum(h) + " " + ap : arNum(h) + ":" + arNum(String(m).padStart(2, "0")) + " " + ap;
+}
+
+/* ---------- weather icons (inline SVG) ---------- */
+const C = { sun:"#f59e0b", moon:"#a5b4fc", cloud:"var(--cloud)", dark:"#64748b", rain:"#3b82f6", bolt:"#f59e0b", snow:"#7dd3fc" };
+const CLOUD = 'M7.5 19h9.5a4.5 4.5 0 0 0 .6-8.96A6.5 6.5 0 0 0 5.2 11.7 3.7 3.7 0 0 0 7.5 19z';
+const SMALL_CLOUD = 'M8.5 20h9a4 4 0 0 0 .5-7.97A5.8 5.8 0 0 0 7 13 3.5 3.5 0 0 0 8.5 20z';
+function svg(inner){ return '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>'; }
+function sunG(cx, cy, r){
+  let rays = ""; for(let i = 0; i < 8; i++){ const a = i * Math.PI / 4, r1 = r + 2, r2 = r + 4;
+    rays += '<path d="M' + (cx + r1 * Math.cos(a)).toFixed(1) + ' ' + (cy + r1 * Math.sin(a)).toFixed(1) + 'L' + (cx + r2 * Math.cos(a)).toFixed(1) + ' ' + (cy + r2 * Math.sin(a)).toFixed(1) + '" stroke="' + C.sun + '" stroke-width="1.8"/>'; }
+  return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + C.sun + '"/>' + rays;
+}
+const moonG = (cx, cy) => '<path d="M' + (cx + 3) + ' ' + (cy + 4.5) + 'A5.5 5.5 0 1 1 ' + (cx + 3.8) + ' ' + (cy - 4) + ' 4.3 4.3 0 0 0 ' + (cx + 3) + ' ' + (cy + 4.5) + 'z" fill="' + C.moon + '"/>';
+const cloudG = (col, d) => '<path d="' + (d || CLOUD) + '" fill="' + col + '"/>';
+const drops = n => (n === 3 ? [8.5, 12.5, 16.5] : [10, 15]).map(x => '<path d="M' + x + ' 18.5l-1 3" stroke="' + C.rain + '" stroke-width="1.9"/>').join("");
+function icon(code, day){
+  day = day !== 0;
+  const UP = 'M7.5 16h9.5a4.5 4.5 0 0 0 .6-8.96A6.5 6.5 0 0 0 5.2 8.7 3.7 3.7 0 0 0 7.5 16z';
+  if(code === 0) return svg(day ? sunG(12, 12, 4.5) : moonG(10, 12));
+  if(code === 1 || code === 2) return svg((day ? sunG(8.5, 8, 3.2) : moonG(7, 8)) + cloudG(C.cloud, SMALL_CLOUD));
+  if(code === 3) return svg(cloudG(C.cloud));
+  if(code === 45 || code === 48) return svg(cloudG(C.cloud, UP) + '<path d="M5 19h14M7 22h10" stroke="' + C.cloud + '" stroke-width="1.8"/>');
+  if(code >= 95) return svg(cloudG(C.dark, UP) + '<path d="M12.5 16.5l-2.5 3.5h3l-2 3.5" stroke="' + C.bolt + '" stroke-width="1.9"/>');
+  if((code >= 71 && code <= 77) || code === 85 || code === 86)
+    return svg(cloudG(C.cloud, UP) + [8.5, 12.5, 16.5].map((x, i) => '<circle cx="' + x + '" cy="' + (19.5 + (i % 2) * 2) + '" r="1.1" fill="' + C.snow + '"/>').join(""));
+  if(code >= 51) {
+    const heavy = [55, 65, 67, 82].includes(code);
+    return svg(cloudG(heavy ? C.dark : C.cloud, UP) + drops(heavy ? 3 : 2));
+  }
+  return svg(cloudG(C.cloud));
+}
+const WMO = {0:"صحو",1:"صحو غالباً",2:"غائم جزئياً",3:"غائم",45:"ضباب",48:"ضباب",51:"رذاذ خفيف",53:"رذاذ",55:"رذاذ كثيف",
+  56:"رذاذ متجمد",57:"رذاذ متجمد",61:"مطر خفيف",63:"مطر متوسط",65:"مطر غزير",66:"مطر متجمد",67:"مطر متجمد غزير",
+  71:"ثلج خفيف",73:"ثلج",75:"ثلج كثيف",77:"حبيبات ثلج",80:"زخات خفيفة",81:"زخات مطر",82:"زخات غزيرة",85:"زخات ثلج",86:"زخات ثلج",
+  95:"عواصف رعدية",96:"رعد مع برد",99:"رعد قوي مع برد"};
+const DAYS = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const ICONS = {
+  check:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+  umbrella:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 18 0z"/><path d="M12 12v7a2 2 0 0 0 4 0"/></svg>',
+  clock:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  play:'<path d="M7 4.5v15l12-7.5z"/>', pause:'<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>'
+};
+
+/* ---------- map ---------- */
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const map = L.map("map", { zoomControl:false, attributionControl:true, maxZoom:11, minZoom:3, worldCopyJump:true }).setView([24.71, 46.67], 6);
+map.attributionControl.setPrefix(false);
+// Optional: a free CARTO key (carto.com/basemaps/apikey) gives nicer light/dark maps. Empty = OpenStreetMap (no key needed).
+const CARTO_KEY = "";
+let base = null;
+function setBase(){
+  if(base) map.removeLayer(base);
+  const el = document.getElementById("map");
+  if(CARTO_KEY){
+    el.classList.remove("osm-dark");
+    base = L.tileLayer("https://{s}.basemaps.cartocdn.com/" + (dark.matches ? "dark_all" : "rastertiles/voyager") + "/{z}/{x}/{y}{r}.png?key=" + encodeURIComponent(CARTO_KEY), {
+      subdomains:"abcd", maxZoom:19, className:"base-tiles", attribution:"© OpenStreetMap © CARTO"
+    });
+  }else{
+    el.classList.toggle("osm-dark", dark.matches);
+    base = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom:19, className:"base-tiles osm", attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+    });
+  }
+  base.addTo(map); base.bringToBack();
+}
+setBase();
+try{ dark.addEventListener("change", setBase); }catch(e){}
+
+$("#zIn").onclick = () => map.zoomIn();
+$("#zOut").onclick = () => map.zoomOut();
+
+/* ---------- RainViewer radar (past) + Open-Meteo grid (future) ---------- */
+// Free RainViewer API (since 1 Jan 2026): past frames only, max zoom 7, colour scheme 2, ~100 req/min/IP.
+// Future frames: Open-Meteo 15-min precipitation sampled on a grid over the view and drawn on a canvas.
+const RV_COLOR = 2, RV_OPTS = "1_0";
+const FC_STEPS = 12;            // 12 x 15 min = 3 hours ahead
+const FC_GRID = 13;             // 13 x 13 sample points
+let rv = null, frames = [], layers = {}, idx = 0, playing = false, playTimer = null;
+let opacity = 0.8;
+const state = { radar:true, clouds:false, coverage:false };
+const fc = { frames:[], bounds:null, zoom:null, at:0, overlay:null, loading:false };
+const total = () => frames.length + fc.frames.length;
+
+function radarLayer(f){
+  if(!layers[f.path]){
+    layers[f.path] = L.tileLayer(rv.host + f.path + "/512/{z}/{x}/{y}/" + RV_COLOR + "/" + RV_OPTS + ".png", {
+      tileSize:512, zoomOffset:-1, maxNativeZoom:8, maxZoom:12, opacity:0, zIndex:400, updateWhenIdle:true, keepBuffer:1,
+      attribution:'<a href="https://www.rainviewer.com" target="_blank">RainViewer</a>'
+    });
+  }
+  return layers[f.path];
+}
+function clearRadar(){
+  Object.values(layers).forEach(l => map.removeLayer(l));
+  if(fc.overlay){ map.removeLayer(fc.overlay); fc.overlay = null; }
+}
+
+async function loadRadar(){
+  try{
+    const r = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache:"no-store" });
+    const j = await r.json();
+    clearRadar(); layers = {};
+    rv = j; frames = (j.radar && j.radar.past) || [];
+    if(coverageLayer){ map.removeLayer(coverageLayer); coverageLayer = null; }
+    if(state.coverage) toggleCoverage(true);
+    updateSlider();
+    showFrame(frames.length - 1);
+  }catch(e){ $("#tlTime").textContent = "تعذّر تحميل الرادار"; $("#tlAgo").textContent = ""; }
+  loadFutureGrid(true);
+}
+
+function updateSlider(){
+  const s = $("#slider"), n = total();
+  s.max = Math.max(n - 1, 0);
+  const split = n > 1 && fc.frames.length ? ((frames.length - 1) / (n - 1)) * 100 : 100;
+  s.style.setProperty("--split", split + "%");
+}
+
+/* --- future frames --- */
+const RAMP = [[0.1,[136,221,238]],[0.5,[0,153,204]],[1.5,[0,85,136]],[4,[255,238,0]],[10,[255,136,0]],[25,[212,0,0]],[50,[255,102,255]]];
+function rampColor(v){
+  if(v <= RAMP[0][0]) return RAMP[0][1];
+  for(let i = 1; i < RAMP.length; i++){
+    if(v <= RAMP[i][0]){
+      const [a, ca] = RAMP[i - 1], [b, cb] = RAMP[i];
+      const t = (Math.log(v) - Math.log(a)) / (Math.log(b) - Math.log(a));
+      return [0,1,2].map(k => Math.round(ca[k] + (cb[k] - ca[k]) * t));
+    }
+  }
+  return RAMP[RAMP.length - 1][1];
+}
+function renderGrid(grid, N){
+  const W = 180, cv = document.createElement("canvas"); cv.width = cv.height = W;
+  const ctx = cv.getContext("2d"), img = ctx.createImageData(W, W), d = img.data;
+  for(let y = 0; y < W; y++){
+    const gy = y / (W - 1) * (N - 1), y0 = Math.floor(gy), y1 = Math.min(y0 + 1, N - 1), fy = gy - y0;
+    for(let x = 0; x < W; x++){
+      const gx = x / (W - 1) * (N - 1), x0 = Math.floor(gx), x1 = Math.min(x0 + 1, N - 1), fx = gx - x0;
+      const v = (grid[y0*N+x0] * (1-fx) + grid[y0*N+x1] * fx) * (1-fy) + (grid[y1*N+x0] * (1-fx) + grid[y1*N+x1] * fx) * fy;
+      const o = (y * W + x) * 4;
+      if(v < 0.1){ d[o+3] = 0; continue; }
+      const c = rampColor(v);
+      d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = v < 0.3 ? 110 + (v - 0.1) / 0.2 * 100 : 215;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL("image/png");
+}
+async function loadFutureGrid(force){
+  if(fc.loading) return;
+  const view = map.getBounds(), z = map.getZoom();
+  if(!force && fc.bounds && fc.bounds.contains(view) && Math.abs(fc.zoom - z) < 2 && Date.now() - fc.at < 15 * 60000) return;
+  fc.loading = true;
+  const b = view.pad(0.35), N = FC_GRID;
+  let s = Math.max(b.getSouth(), -80), n = Math.min(b.getNorth(), 80), w = b.getWest(), e = b.getEast();
+  if(e - w > 340){ w = -170; e = 170; }
+  const my = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+  const iy = y => (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
+  const ys = my(s), yn = my(n), lats = [], lons = [];
+  for(let r = 0; r < N; r++){
+    const lat = iy(yn - (yn - ys) * r / (N - 1));          // even spacing on the Mercator map
+    for(let c = 0; c < N; c++){
+      const lon = ((w + (e - w) * c / (N - 1)) + 540) % 360 - 180;
+      lats.push(lat.toFixed(3)); lons.push(lon.toFixed(3));
+    }
+  }
+  try{
+    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lats.join(",") + "&longitude=" + lons.join(",") +
+      "&minutely_15=precipitation&forecast_minutely_15=" + (FC_STEPS + 4) + "&timezone=GMT";
+    const j = await (await fetch(url)).json();
+    const arr = Array.isArray(j) ? j : [j];
+    if(arr.length !== N * N || !arr[0].minutely_15) throw new Error("grid");
+    const times = arr[0].minutely_15.time.map(t => Date.parse(t + "Z") / 1000);
+    const after = frames.length ? frames[frames.length - 1].time : Date.now() / 1000 - 600;
+    const out = [];
+    times.forEach((t, k) => {
+      if(t <= after || out.length >= FC_STEPS) return;
+      const grid = new Float32Array(N * N);
+      for(let p = 0; p < N * N; p++) grid[p] = (arr[p].minutely_15.precipitation[k] || 0) * 4;   // mm per 15 min -> mm/h
+      out.push({ time:t, url:renderGrid(grid, N) });
+    });
+    const wasFuture = idx >= frames.length;
+    fc.frames = out; fc.bounds = L.latLngBounds([s, w], [n, e]); fc.zoom = z; fc.at = Date.now();
+    if(fc.overlay){ map.removeLayer(fc.overlay); fc.overlay = null; }
+    updateSlider();
+    if(wasFuture || playing) showFrame(Math.min(idx, total() - 1));
+  }catch(err){}
+  fc.loading = false;
+}
+let moveTimer = null;
+map.on("moveend", () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => loadFutureGrid(false), 700); });
+
+function showFrame(i){
+  const n = total(); if(!n) return;
+  i = (i + n) % n; idx = i;
+  const future = i >= frames.length;
+  const f = future ? fc.frames[i - frames.length] : frames[i];
+  if(state.radar){
+    if(!future){
+      const cur = radarLayer(f); if(!map.hasLayer(cur)) cur.addTo(map);
+      if(playing && i + 1 < frames.length){ const nl = radarLayer(frames[i + 1]); if(!map.hasLayer(nl)) nl.addTo(map); }
+      Object.entries(layers).forEach(([p, l]) => l.setOpacity(p === f.path ? opacity : 0));
+      if(fc.overlay) fc.overlay.setOpacity(0);
+    }else{
+      Object.values(layers).forEach(l => l.setOpacity(0));
+      if(!fc.overlay) fc.overlay = L.imageOverlay(f.url, fc.bounds, { opacity, zIndex:400, interactive:false, className:"fc-img", attribution:"Open-Meteo" }).addTo(map);
+      else { fc.overlay.setUrl(f.url); fc.overlay.setOpacity(opacity); }
+    }
+  }
+  $("#slider").value = i;
+  const t = new Date(f.time * 1000), mins = Math.round((t.getTime() - Date.now()) / 60000);
+  $("#tlTime").textContent = fmtClock(t);
+  $(".ptime").classList.toggle("fut", future);
+  $("#tlAgo").textContent = future ? "توقع · بعد " + arNum(Math.max(mins, 5)) + " دقيقة"
+    : (i === frames.length - 1 ? "الآن · " : "") + "رادار · قبل " + arNum(Math.max(-mins, 0)) + " دقيقة";
+}
+
+function setPlaying(p){
+  playing = p;
+  $("#playIc").innerHTML = p ? ICONS.pause : ICONS.play;
+  clearTimeout(playTimer);
+  if(p){
+    const step = () => {
+      showFrame(idx + 1);
+      const atNow = idx === frames.length - 1, atEnd = idx === total() - 1;
+      playTimer = setTimeout(step, atEnd ? 1800 : atNow ? 1200 : 550);
+    };
+    step();
+  }
+}
+$("#play").onclick = () => { if(!state.radar) setLayer("radar", true); setPlaying(!playing); };
+$("#slider").oninput = e => { setPlaying(false); showFrame(+e.target.value); };
+$("#opacity").oninput = e => {
+  opacity = e.target.value / 100;
+  if(total() && state.radar) showFrame(idx);
+  if(cloudLayer) cloudLayer.setOpacity(Math.min(opacity, .7));
+};
+
+/* ---------- coverage mask ---------- */
+let coverageLayer = null;
+function toggleCoverage(on){
+  if(on){
+    if(!rv) return;
+    coverageLayer = L.tileLayer(rv.host + "/v2/coverage/0/512/{z}/{x}/{y}/0/0_0.png", {
+      tileSize:512, zoomOffset:-1, maxNativeZoom:8, maxZoom:12, opacity:.35, zIndex:350
+    }).addTo(map);
+  }else if(coverageLayer){ map.removeLayer(coverageLayer); coverageLayer = null; }
+}
+
+/* ---------- EUMETSAT clouds (WMS) ---------- */
+const EUM_WMS = "https://view.eumetsat.int/geoserver/wms";
+const EUM_CANDIDATES = ["mtg_fd:ir105_hrfi", "mtg_fd:ir105", "msg_iodc:ir108", "msg_fes:ir108"];
+let cloudLayer = null, eumLayerName = null;
+async function pickEumLayer(){
+  if(eumLayerName) return eumLayerName;
+  eumLayerName = EUM_CANDIDATES[0];
+  try{
+    const ctl = new AbortController(); setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(EUM_WMS + "?service=WMS&request=GetCapabilities&version=1.3.0", { signal:ctl.signal });
+    const xml = await r.text();
+    const names = new Set([...xml.matchAll(/<Name>([^<]+)<\/Name>/g)].map(m => m[1]));
+    const found = EUM_CANDIDATES.find(n => names.has(n))
+      || [...names].find(n => /^mtg_fd:ir10/i.test(n))
+      || [...names].find(n => /ir108/i.test(n) && /iodc|fes/i.test(n));
+    if(found) eumLayerName = found;
+  }catch(e){}
+  return eumLayerName;
+}
+async function toggleClouds(on){
+  if(on){
+    const name = await pickEumLayer();
+    if(!state.clouds) return;
+    cloudLayer = L.tileLayer.wms(EUM_WMS, { layers:name, format:"image/png", transparent:true, version:"1.3.0",
+      opacity:Math.min(opacity, .7), zIndex:300, attribution:"EUMETSAT" }).addTo(map);
+  }else if(cloudLayer){ map.removeLayer(cloudLayer); cloudLayer = null; }
+}
+
+/* ---------- layer buttons ---------- */
+function setLayer(l, on){
+  state[l] = on;
+  document.querySelector('.layers [data-l="' + l + '"]').classList.toggle("on", on);
+  if(l === "radar"){ if(on) showFrame(idx); else { setPlaying(false); clearRadar(); } }
+  if(l === "clouds") toggleClouds(on);
+  if(l === "coverage") toggleCoverage(on);
+}
+document.querySelectorAll(".layers button").forEach(b => b.onclick = () => setLayer(b.dataset.l, !state[b.dataset.l]));
+
+/* ---------- place, search, location ---------- */
+let place = store.get("rr_place", { name:"الرياض", lat:24.7136, lon:46.6753 });
+let meMarker = null;
+function setPlace(p, fly){
+  place = p; store.set("rr_place", p);
+  $("#placeName").textContent = p.name;
+  updateStar();
+  if(meMarker) map.removeLayer(meMarker);
+  meMarker = L.marker([p.lat, p.lon], { icon:L.divIcon({ className:"", html:'<div class="me-dot"></div>', iconSize:[16,16], iconAnchor:[8,8] }), interactive:false }).addTo(map);
+  if(fly) map.flyTo([p.lat, p.lon], 7, { duration:.9 });
+  loadForecast();
+}
+async function reverseName(lat, lon){
+  try{
+    const r = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=ar");
+    const j = await r.json(); return j.city || j.locality || j.principalSubdivision || "موقعي";
+  }catch(e){ return "موقعي"; }
+}
+$("#locBtn").onclick = () => {
+  if(!navigator.geolocation){ toast("المتصفح لا يدعم تحديد الموقع"); return; }
+  const b = $("#locBtn"); b.classList.add("on");
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = +pos.coords.latitude.toFixed(4), lon = +pos.coords.longitude.toFixed(4);
+    setPlace({ name: await reverseName(lat, lon), lat, lon }, true);
+  }, () => { b.classList.remove("on"); toast("لم يُسمح بالموقع — ابحث عن مدينتك"); },
+  { enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
+};
+
+let qTimer = null;
+$("#q").addEventListener("input", e => {
+  clearTimeout(qTimer); const v = e.target.value.trim();
+  if(v.length < 2){ showTop(); return; }
+  qTimer = setTimeout(() => searchCity(v), 350);
+});
+async function searchCity(v){
+  try{
+    const r = await fetch("https://geocoding-api.open-meteo.com/v1/search?count=6&language=ar&format=json&name=" + encodeURIComponent(v));
+    const j = await r.json(); const box = $("#results"); box.innerHTML = "";
+    (j.results || []).forEach(x => {
+      const d = document.createElement("div"); d.innerHTML = "<b></b><br><small></small>";
+      d.querySelector("b").textContent = x.name;
+      d.querySelector("small").textContent = [x.admin1, x.country].filter(Boolean).join("، ");
+      d.onclick = () => { box.style.display = "none"; $("#q").value = ""; $("#q").blur(); $("#locBtn").classList.remove("on"); countSearch(x.latitude, x.longitude); setPlace({ name:x.name, lat:x.latitude, lon:x.longitude }, true); };
+      box.appendChild(d);
+    });
+    if(!box.children.length) box.innerHTML = '<div class="muted">لا توجد نتائج</div>';
+    box.style.display = "block";
+  }catch(e){ toast("تعذّر البحث"); }
+}
+document.addEventListener("click", e => { if(!e.target.closest(".search")) $("#results").style.display = "none"; });
+$("#q").addEventListener("focus", () => { if($("#q").value.trim().length < 2) showTop(); });
+
+/* ---------- most searched (shared counters per city) ---------- */
+const CITIES = [
+  ["الرياض",24.7136,46.6753,"riyadh"],["جدة",21.4858,39.1925,"jeddah"],["مكة المكرمة",21.3891,39.8579,"makkah"],
+  ["المدينة المنورة",24.5247,39.5692,"madinah"],["الدمام",26.4207,50.0888,"dammam"],["الخبر",26.2172,50.1971,"khobar"],
+  ["الظهران",26.2361,50.0393,"dhahran"],["الأحساء",25.3830,49.5860,"ahsa"],["الجبيل",27.0174,49.6225,"jubail"],
+  ["القطيف",26.5196,50.0115,"qatif"],["حفر الباطن",28.4342,45.9636,"hafar"],["الطائف",21.2703,40.4158,"taif"],
+  ["أبها",18.2164,42.5053,"abha"],["خميس مشيط",18.3000,42.7333,"khamis"],["الباحة",20.0129,41.4677,"baha"],
+  ["جازان",16.8892,42.5511,"jazan"],["نجران",17.4924,44.1277,"najran"],["بيشة",19.9900,42.6000,"bisha"],
+  ["تبوك",28.3835,36.5662,"tabuk"],["العلا",26.6085,37.9232,"alula"],["ينبع",24.0895,38.0618,"yanbu"],
+  ["حائل",27.5114,41.7208,"hail"],["بريدة",26.3260,43.9750,"buraidah"],["عنيزة",26.0840,43.9930,"unaizah"],
+  ["الرس",25.8694,43.4973,"rass"],["سكاكا",29.9697,40.2064,"sakaka"],["عرعر",30.9753,41.0381,"arar"],
+  ["القريات",31.3317,37.3428,"qurayyat"],["الخرج",24.1556,47.3122,"kharj"],["المجمعة",25.9047,45.3450,"majmaah"],
+  ["الدوادمي",24.5070,44.3920,"dawadmi"],["وادي الدواسر",20.4600,44.7800,"wadi"],["القنفذة",19.1264,41.0789,"qunfudhah"],
+  ["رابغ",22.7986,39.0349,"rabigh"],["النماص",19.1200,42.1200,"namas"],["شرورة",17.4667,47.1167,"sharurah"]
+];
+let topCache = null, topAt = 0;
+async function abacus(mode, key){
+  const r = await fetch(COUNTER_URL + "/" + mode + "/" + COUNTER_NS + "/" + key, { cache:"no-store" });
+  if(r.status === 404) return 0;
+  if(!r.ok) throw new Error("counter");
+  const j = await r.json(); return typeof j.value === "number" ? j.value : 0;
+}
+async function loadTop(){
+  if(topCache && Date.now() - topAt < 60000) return topCache;
+  const all = [];
+  for(let i = 0; i < CITIES.length; i += 12){
+    const part = CITIES.slice(i, i + 12);
+    const vals = await Promise.all(part.map(c => abacus("get", "city-" + c[3]).catch(() => 0)));
+    part.forEach((c, k) => all.push({ c, n:vals[k] }));
+  }
+  topCache = all.filter(x => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 8);
+  topAt = Date.now(); return topCache;
+}
+function nearestCity(lat, lon){
+  let best = null, bd = 1e9;
+  CITIES.forEach(c => { const d = Math.hypot((c[1] - lat) * 111, (c[2] - lon) * 111 * Math.cos(lat * Math.PI / 180)); if(d < bd){ bd = d; best = c; } });
+  return bd <= 30 ? best : null;
+}
+function countSearch(lat, lon){
+  // one count per city per device per day
+  const c = nearestCity(lat, lon); if(!c) return;
+  const k = "rr_s_" + c[3], today = new Date().toISOString().slice(0, 10);
+  if(store.get(k, "") === today) return;
+  abacus("hit", "city-" + c[3]).then(() => { store.set(k, today); topAt = 0; }).catch(() => {});
+}
+async function showTop(){
+  const box = $("#results");
+  box.innerHTML = '<div class="rh">الأكثر بحثاً</div><div class="rh">…</div>';
+  box.style.display = "block";
+  let list = [];
+  try{ list = await loadTop(); }catch(e){}
+  if($("#q").value.trim().length >= 2 || document.activeElement !== $("#q") && box.style.display === "none") return;
+  box.innerHTML = '<div class="rh">الأكثر بحثاً</div>';
+  if(!list.length){ box.insertAdjacentHTML("beforeend", '<div class="rh">لا توجد عمليات بحث بعد</div>'); return; }
+  list.forEach((x, i) => {
+    const d = document.createElement("div"); d.className = "row";
+    d.innerHTML = '<span class="rk"></span><span class="nm"></span><span class="cnt"></span>';
+    d.querySelector(".rk").textContent = arNum(i + 1);
+    d.querySelector(".nm").textContent = x.c[0];
+    d.querySelector(".cnt").textContent = x.n.toLocaleString("ar-SA");
+    d.onclick = () => { box.style.display = "none"; $("#q").blur(); $("#locBtn").classList.remove("on"); countSearch(x.c[1], x.c[2]); setPlace({ name:x.c[0], lat:x.c[1], lon:x.c[2] }, true); };
+    box.appendChild(d);
+  });
+}
+map.on("contextmenu", async e => {
+  const lat = +e.latlng.lat.toFixed(4), lon = +e.latlng.lng.toFixed(4);
+  $("#locBtn").classList.remove("on");
+  setPlace({ name: await reverseName(lat, lon), lat, lon }, false); toast("التوقعات لهذه النقطة");
+});
+
+/* ---------- favourites ---------- */
+let favs = store.get("rr_favs", []);
+const same = f => Math.abs(f.lat - place.lat) < .01 && Math.abs(f.lon - place.lon) < .01;
+function updateStar(){ const on = favs.some(same); const s = $("#star"); s.classList.toggle("on", on); s.querySelector("path").setAttribute("fill", on ? "currentColor" : "none"); }
+$("#star").onclick = () => {
+  if(favs.some(same)){ favs = favs.filter(f => !same(f)); toast("أُزيلت من المفضلة"); }
+  else { favs.push({ ...place }); toast("أُضيفت للمفضلة"); }
+  store.set("rr_favs", favs); updateStar(); renderFavs();
+};
+function renderFavs(){
+  const box = $("#favs"); box.innerHTML = "";
+  if(!favs.length){ box.innerHTML = '<span class="muted">اضغط النجمة بجانب اسم المدينة لإضافتها هنا</span>'; return; }
+  favs.forEach((f, i) => {
+    const el = document.createElement("span"); el.className = "fav";
+    el.innerHTML = '<span class="n"></span><span class="x" aria-label="حذف">✕</span>';
+    el.querySelector(".n").textContent = f.name;
+    el.onclick = ev => {
+      if(ev.target.classList.contains("x")){ favs.splice(i, 1); store.set("rr_favs", favs); renderFavs(); updateStar(); return; }
+      $("#locBtn").classList.remove("on"); setPlace(f, true); window.scrollTo({ top:0, behavior:"smooth" });
+    };
+    box.appendChild(el);
+  });
+}
+
+/* ---------- forecast (Open-Meteo) ---------- */
+async function loadForecast(){
+  const u = "https://api.open-meteo.com/v1/forecast?latitude=" + place.lat + "&longitude=" + place.lon +
+    "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,is_day" +
+    "&minutely_15=precipitation&hourly=temperature_2m,precipitation_probability,weather_code,is_day" +
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max" +
+    "&timezone=auto&forecast_days=7";
+  try{
+    const j = await (await fetch(u)).json();
+    renderNow(j); renderNowcast(j); renderHours(j); renderDays(j);
+  }catch(e){ setAlert("dry", ICONS.clock, "تعذّر تحميل التوقعات — تأكد من الاتصال"); }
+}
+function setAlert(kind, ic, text){ const a = $("#alertBox"); a.className = "alert " + kind; a.querySelector(".ai").innerHTML = ic; a.querySelector(".at").textContent = text; }
+
+function renderNow(j){
+  const c = j.current;
+  $("#nowIc").innerHTML = icon(c.weather_code, c.is_day);
+  $("#nowT").textContent = arNum(Math.round(c.temperature_2m)) + "°";
+  $("#nowD").textContent = (WMO[c.weather_code] || "—") + (c.precipitation > 0 ? " · " + arNum(c.precipitation) + " مم" : "");
+  $("#sFeel").textContent = arNum(Math.round(c.apparent_temperature)) + "°";
+  $("#sHum").textContent = arNum(c.relative_humidity_2m) + "٪";
+  $("#sWind").textContent = arNum(Math.round(c.wind_speed_10m));
+  $("#sCloud").textContent = arNum(c.cloud_cover) + "٪";
+}
+
+function renderNowcast(j){
+  const m = j.minutely_15; if(!m) return;
+  const nowStr = j.current.time;
+  let s = m.time.findIndex(t => t >= nowStr); if(s < 0) s = 0;
+  const vals = m.precipitation.slice(s, s + 8).map(v => v || 0);
+  const max = Math.max(1, ...vals), box = $("#nowcast"); box.innerHTML = "";
+  vals.forEach((v, i) => {
+    const el = document.createElement("div"); el.className = "nc";
+    const h = v > 0 ? Math.max(8, (v / max) * 64) : 4;
+    el.innerHTML = '<small class="v">' + (v > 0 ? arNum(v.toFixed(1)) : "&nbsp;") + '</small><div class="b' + (v > 0 ? "" : " zero") + '" style="height:' + h + 'px"></div><small>' + (i === 0 ? "الآن" : arNum(i * 15) + "د") + "</small>";
+    box.appendChild(el);
+  });
+  const first = vals.findIndex(v => v >= 0.1);
+  if(vals[0] >= 0.1){
+    setAlert("rain", ICONS.umbrella, "مطر الآن في " + place.name + " — حوالي " + arNum(vals.reduce((a, b) => a + b, 0).toFixed(1)) + " مم خلال ساعتين");
+  }else if(first > 0){
+    setAlert("rain", ICONS.umbrella, "يُتوقع بدء المطر بعد ~" + arNum(first * 15) + " دقيقة في " + place.name);
+  }else{
+    const hp = j.hourly.precipitation_probability, hs = Math.max(0, j.hourly.time.findIndex(t => t >= nowStr.slice(0, 13)));
+    const next = hp.slice(hs, hs + 12), pk = Math.max(...next), pi = next.indexOf(pk);
+    if(pk >= 40) setAlert("dry", ICONS.clock, "لا مطر خلال ساعتين — احتمال " + arNum(pk) + "٪ بعد " + arNum(pi) + " ساعات");
+    else setAlert("dry", ICONS.check, "لا مطر متوقع في " + place.name + " خلال الساعات القادمة");
+  }
+}
+
+function renderHours(j){
+  const h = j.hourly, box = $("#hours"); box.innerHTML = "";
+  let s = h.time.findIndex(t => t >= j.current.time.slice(0, 13)); if(s < 0) s = 0;
+  for(let i = s; i < Math.min(s + 24, h.time.length); i++){
+    const p = h.precipitation_probability[i];
+    const el = document.createElement("div"); el.className = "h" + (i === s ? " cur" : "");
+    el.innerHTML = "<small>" + (i === s ? "الآن" : fmtClock(new Date(h.time[i]), true)) + '</small><div class="e">' + icon(h.weather_code[i], h.is_day[i]) + "</div><b>" +
+      arNum(Math.round(h.temperature_2m[i])) + '°</b><div class="p">' + (p >= 10 ? arNum(p) + "٪" : "") + "</div>";
+    box.appendChild(el);
+  }
+  box.scrollLeft = 0;
+}
+
+function renderDays(j){
+  const d = j.daily, box = $("#days"); box.innerHTML = "";
+  const lo = Math.min(...d.temperature_2m_min), hi = Math.max(...d.temperature_2m_max), span = Math.max(1, hi - lo);
+  d.time.forEach((t, i) => {
+    const dt = new Date(t + "T12:00"), p = d.precipitation_probability_max[i];
+    const a = ((d.temperature_2m_min[i] - lo) / span) * 100, b = ((d.temperature_2m_max[i] - lo) / span) * 100;
+    const el = document.createElement("div"); el.className = "dr";
+    el.innerHTML = "<span>" + (i === 0 ? "اليوم" : DAYS[dt.getDay()]) + '</span><div class="e">' + icon(d.weather_code[i], 1) + "</div>" +
+      '<div class="rngw"><small>' + arNum(Math.round(d.temperature_2m_min[i])) + '°</small><div class="rng"><i style="left:' + a + "%;width:" + Math.max(5, b - a) + '%"></i></div><b>' +
+      arNum(Math.round(d.temperature_2m_max[i])) + '°</b></div><span class="pp">' +
+      (p >= 10 ? arNum(p) + "٪" + (d.precipitation_sum[i] > 0 ? "<br>" + arNum(d.precipitation_sum[i].toFixed(1)) + " مم" : "") : "") + "</span>";
+    box.appendChild(el);
+  });
+}
+
+/* ---------- refresh ---------- */
+function refreshAll(){ loadRadar(); loadForecast(); if(cloudLayer) cloudLayer.setParams({ _t:Date.now() }); }
+$("#refBtn").onclick = () => { const b = $("#refBtn"); b.classList.remove("spin"); void b.offsetWidth; b.classList.add("spin"); refreshAll(); toast("تم التحديث"); };
+setInterval(refreshAll, 10 * 60 * 1000);
+document.addEventListener("visibilitychange", () => { if(!document.hidden && rv && Date.now() / 1000 - rv.generated > 600) refreshAll(); });
+
+/* ---------- visitor counter (abacus, free, no key) ---------- */
+const COUNTER_URL = "https://abacus.jasoncameron.dev", COUNTER_NS = "sahaba-rain-radar-sa", COUNTER_KEY = "visitors";
+async function loadVisitors(){
+  // one count per device per day; never counts while testing locally
+  const local = location.protocol === "file:" || /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname);
+  const today = new Date().toISOString().slice(0, 10);
+  const mode = (!local && store.get("rr_counted", "") !== today) ? "hit" : "get";
+  try{
+    const r = await fetch(COUNTER_URL + "/" + mode + "/" + COUNTER_NS + "/" + COUNTER_KEY, { cache:"no-store" });
+    const j = r.status === 404 ? { value:0 } : (r.ok ? await r.json() : {});
+    if(typeof j.value !== "number") return;
+    if(mode === "hit") store.set("rr_counted", today);
+    $("#visitsN").textContent = j.value.toLocaleString("ar-SA");
+    $("#visits").hidden = false;
+  }catch(e){}
+}
+
+/* ---------- start ---------- */
+loadVisitors();
+renderFavs();
+setPlace(place, false);
+map.setView([place.lat, place.lon], 6);
+loadRadar();
+})();
+</script>
+</body>
+</html>
