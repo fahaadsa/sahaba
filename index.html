@@ -198,6 +198,35 @@ footer a{color:var(--acc);text-decoration:none}
 @media (max-height:500px) and (orientation:landscape){
   .mapbox{height:78vh;min-height:260px}
 }
+/* ---------- install ---------- */
+.ibtn[hidden]{display:none}
+.ibtn{color:var(--acc)}
+.inst{position:fixed;left:12px;right:12px;bottom:calc(var(--safe-b) + 12px);z-index:2500;max-width:520px;margin:0 auto;
+  background:var(--card);border-radius:20px;box-shadow:0 12px 40px rgba(15,23,42,.28);padding:14px;display:flex;align-items:center;gap:12px;
+  transform:translateY(140%);transition:transform .35s ease}
+.inst.show{transform:none}
+.inst img{width:52px;height:52px;border-radius:12px;flex:none}
+.inst .tx{flex:1;min-width:0}
+.inst .tx b{display:block;font-size:15px}
+.inst .tx small{display:block;color:var(--mut);font-size:12.5px;line-height:1.5}
+.inst .acts{display:flex;flex-direction:column;gap:6px;flex:none}
+.btn{height:38px;padding:0 16px;border-radius:11px;font-size:14px;font-weight:600;white-space:nowrap}
+.btn.pri{background:#2563eb;color:#fff}
+.btn.sec{color:var(--mut);height:28px;font-weight:500;font-size:13px}
+.sheet-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2600;display:none;align-items:flex-end;justify-content:center}
+.sheet-bg.show{display:flex}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:22px 20px calc(var(--safe-b) + 20px);max-height:88vh;overflow:auto}
+@media (min-width:740px){.sheet-bg{align-items:center}.sheet{border-radius:24px}}
+.sheet .hd{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.sheet .hd img{width:56px;height:56px;border-radius:13px}
+.sheet .hd b{font-size:18px;display:block}
+.sheet .hd small{color:var(--mut);font-size:13px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.steps li{display:flex;align-items:center;gap:12px;background:var(--soft);border-radius:14px;padding:12px;font-size:14.5px;line-height:1.6}
+.steps .n{width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.steps .gi{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--card);color:#2563eb;vertical-align:middle;margin:0 3px;box-shadow:var(--shadow)}
+.sheet .warn{margin-top:12px;font-size:13px;color:var(--mut);line-height:1.7}
+.sheet .btn.pri{width:100%;margin-top:16px;height:46px;font-size:15px}
 .toast{position:fixed;bottom:calc(var(--safe-b) + 18px);left:50%;transform:translateX(-50%) translateY(10px);background:#0f172a;color:#fff;
   padding:10px 16px;border-radius:12px;font-size:14px;z-index:3000;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%)}
@@ -221,6 +250,9 @@ footer a{color:var(--acc);text-decoration:none}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
         <b id="visitsN">—</b><span>زائر</span>
       </div>
+      <button class="hbtn ibtn" id="instBtn" hidden aria-label="تثبيت التطبيق" title="تثبيت التطبيق">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      </button>
       <button class="hbtn" id="refBtn" aria-label="تحديث">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
       </button>
@@ -323,6 +355,21 @@ footer a{color:var(--acc);text-decoration:none}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="inst" id="inst" role="dialog" aria-label="تثبيت سحابة">
+  <img src="apple-touch-icon.png" alt="">
+  <div class="tx"><b>ثبّت سحابة كتطبيق</b><small>تفتح من الشاشة الرئيسية بسرعة وبدون شريط المتصفح</small></div>
+  <div class="acts"><button class="btn pri" id="instGo">تثبيت</button><button class="btn sec" id="instLater">لاحقاً</button></div>
+</div>
+
+<div class="sheet-bg" id="sheetBg">
+  <div class="sheet" role="dialog" aria-label="طريقة التثبيت">
+    <div class="hd"><img src="apple-touch-icon.png" alt=""><div><b>تثبيت سحابة</b><small id="sheetSub">ثلاث خطوات فقط</small></div></div>
+    <ol class="steps" id="steps"></ol>
+    <div class="warn" id="sheetWarn"></div>
+    <button class="btn pri" id="sheetOk">تمام</button>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -873,6 +920,86 @@ async function loadVisitors(){
     $("#visitsN").textContent = j.value.toLocaleString("ar-SA");
     $("#visits").hidden = false;
   }catch(e){}
+}
+
+/* ---------- install as app ---------- */
+const UA = navigator.userAgent;
+const isIOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/i.test(UA);
+const inApp = /FBAN|FBAV|Instagram|Line\/|Snapchat|TikTok|Twitter|WhatsApp/i.test(UA);
+const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let deferredPrompt = null;
+const GI = {
+  share:'<span class="gi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>',
+  add:'<span class="gi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>',
+  more:'<span class="gi"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>',
+  dots:'<span class="gi"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span>'
+};
+function showSheet(){
+  const steps = $("#steps"), warn = $("#sheetWarn");
+  let list = [], w = "";
+  if(inApp){
+    list = ["اضغط " + GI.dots + " أو " + GI.more + " في أعلى الصفحة", "اختر «فتح في المتصفح» (سفاري أو كروم)", "من هناك اضغط زر التثبيت مرة ثانية"];
+    $("#sheetSub").textContent = "افتح الرابط في المتصفح أولاً";
+  }else if(isIOS){
+    const chrome = /CriOS/.test(UA);
+    list = [
+      chrome ? "اضغط زر المشاركة " + GI.share + " أعلى يمين شريط العنوان"
+             : "اضغط زر المشاركة " + GI.share + " أسفل الشاشة، أو زر " + GI.more + " ثم «مشاركة»",
+      "مرّر للأسفل واختر «إضافة إلى الشاشة الرئيسية» " + GI.add,
+      "اضغط «إضافة» في الأعلى — تظهر أيقونة سحابة مع تطبيقاتك"
+    ];
+    w = "آبل لا تسمح للمواقع بالتثبيت بضغطة واحدة، لذلك تتم من قائمة المشاركة. وإذا ظهر خيار «الفتح كتطبيق ويب» اتركه مفعّلاً.";
+    $("#sheetSub").textContent = "ثلاث خطوات فقط";
+  }else{
+    list = ["اضغط " + GI.dots + " أعلى المتصفح (أو ☰ أسفل الشاشة في متصفح سامسونج)",
+            "اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية» " + GI.add,
+            "اضغط «تثبيت» — تظهر أيقونة سحابة مع تطبيقاتك"];
+    $("#sheetSub").textContent = "ثلاث خطوات فقط";
+  }
+  steps.innerHTML = list.map((s, i) => '<li><span class="n">' + arNum(i + 1) + "</span><span>" + s + "</span></li>").join("");
+  warn.textContent = w; warn.style.display = w ? "block" : "none";
+  $("#sheetBg").classList.add("show");
+}
+$("#sheetOk").onclick = () => $("#sheetBg").classList.remove("show");
+$("#sheetBg").addEventListener("click", e => { if(e.target.id === "sheetBg") $("#sheetBg").classList.remove("show"); });
+
+async function doInstall(){
+  hideBanner();
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const r = await deferredPrompt.userChoice.catch(() => null);
+    deferredPrompt = null;
+    if(r && r.outcome === "accepted") $("#instBtn").hidden = true;
+    return;
+  }
+  showSheet();
+}
+function showBanner(){
+  if(standalone()) return;
+  const until = store.get("rr_inst_later", 0);
+  if(Date.now() < until) return;
+  $("#instGo").textContent = deferredPrompt ? "تثبيت" : "طريقة التثبيت";
+  setTimeout(() => $("#inst").classList.add("show"), 50);
+}
+function hideBanner(){ $("#inst").classList.remove("show"); }
+$("#instGo").onclick = doInstall;
+$("#instBtn").onclick = doInstall;
+$("#instLater").onclick = () => { hideBanner(); store.set("rr_inst_later", Date.now() + 7 * 864e5); };
+
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); deferredPrompt = e;
+  $("#instBtn").hidden = false;
+  showBanner();
+});
+window.addEventListener("appinstalled", () => { deferredPrompt = null; $("#instBtn").hidden = true; hideBanner(); toast("تم تثبيت سحابة"); });
+
+if(!standalone()){
+  if(isIOS || inApp){ $("#instBtn").hidden = false; setTimeout(showBanner, 2500); }
+  else if(isAndroid){ setTimeout(() => { if(!deferredPrompt){ $("#instBtn").hidden = false; showBanner(); } }, 4500); }
+}
+if("serviceWorker" in navigator && location.protocol === "https:"){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 
 /* ---------- start ---------- */
