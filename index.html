@@ -539,6 +539,13 @@ function buildFuture(){
   updateSlider();
   if(idx >= frames.length) showFrame(Math.min(idx, total() - 1));
 }
+function motionText(){
+  const sp = Math.round(Math.hypot(fc.u, fc.v));
+  if(sp < 5) return "السحب شبه ثابتة";
+  const deg = (Math.atan2(fc.u, fc.v) * 180 / Math.PI + 360) % 360;   // direction of travel
+  const dirs = ["الشمال","الشمال الشرقي","الشرق","الجنوب الشرقي","الجنوب","الجنوب الغربي","الغرب","الشمال الغربي"];
+  return "تتحرك نحو " + dirs[Math.round(deg / 45) % 8] + " " + sp + " كم/س";
+}
 function placeFuture(k){
   const c = map.getCenter(), mins = k * 10;
   const dLat = (fc.v * mins / 60) / 111, dLon = (fc.u * mins / 60) / (111 * Math.cos(c.lat * Math.PI / 180));
@@ -571,14 +578,14 @@ function showFrame(i){
         fc.overlay._path = lastF.path; fc.overlay.addTo(map);
       }
       placeFuture(f.k);
-      fc.overlay.setOpacity(opacity * (1 - 0.07 * f.k));
+      fc.overlay.setOpacity(opacity * (1 - 0.035 * f.k));
     }
   }
   $("#slider").value = i;
   const t = new Date(f.time * 1000), mins = Math.round((t.getTime() - Date.now()) / 60000);
   $("#tlTime").textContent = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
   $(".ptime").classList.toggle("fut", future);
-  $("#tlAgo").textContent = future ? "توقع · بعد " + arNum(f.k * 10) + " دقيقة من آخر رادار"
+  $("#tlAgo").textContent = future ? "توقع +" + f.k * 10 + " د · " + motionText()
     : (i === frames.length - 1 ? "الآن · " : "") + "رادار · قبل " + arNum(Math.max(-mins, 0)) + " دقيقة";
 }
 
