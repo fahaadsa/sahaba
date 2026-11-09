@@ -348,7 +348,7 @@ footer a{color:var(--acc);text-decoration:none}
     </section>
 
     <footer>
-      الرادار: <a href="https://www.rainviewer.com" target="_blank" rel="noopener">Weather data by RainViewer</a> · آخر ساعتين، كل ١٠ دقائق<br>
+      الرادار: <a href="https://www.rainviewer.com" target="_blank" rel="noopener">Weather data by RainViewer</a> · آخر ساعتين، كل 10 دقائق<br>
       السحب: <a href="https://view.eumetsat.int" target="_blank" rel="noopener">© EUMETSAT</a> · التوقعات: <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a><br>
       الخريطة: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener">© CARTO</a>
     </footer>
@@ -384,7 +384,7 @@ const store = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
 function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); }
-const arNum = n => String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]);
+const arNum = n => String(n);   // digits shown as 0-9
 function fmtClock(date, short){
   let h = date.getHours(), m = date.getMinutes(); const ap = h < 12 ? "ص" : "م"; h = h % 12 || 12;
   return short ? arNum(h) + " " + ap : arNum(h) + ":" + arNum(String(m).padStart(2, "0")) + " " + ap;
@@ -468,12 +468,11 @@ $("#zOut").onclick = () => map.zoomOut();
 // Free RainViewer API (since 1 Jan 2026): past frames only, max zoom 7, colour scheme 2, ~100 req/min/IP.
 // Future frames: Open-Meteo 15-min precipitation sampled on a grid over the view and drawn on a canvas.
 const RV_COLOR = 2, RV_OPTS = "1_0";
-const FC_STEPS = 12;            // 12 x 15 min = 3 hours ahead
-const FC_GRID = 13;             // 13 x 13 sample points
+const FC_STEPS = 6;             // 6 x 10 min = 1 hour ahead (radar extrapolation)
 let rv = null, frames = [], layers = {}, idx = 0, playing = false, playTimer = null;
 let opacity = 0.8;
 const state = { radar:true, clouds:false, coverage:false };
-const fc = { frames:[], bounds:null, zoom:null, at:0, overlay:null, loading:false };
+const fc = { frames:[], overlay:null, loading:false, u:0, v:0, at:0, lat:null, lon:null };
 const total = () => frames.length + fc.frames.length;
 
 function radarLayer(f){
@@ -501,7 +500,7 @@ async function loadRadar(){
     updateSlider();
     showFrame(frames.length - 1);
   }catch(e){ $("#tlTime").textContent = "تعذّر تحميل الرادار"; $("#tlAgo").textContent = ""; }
-  loadFutureGrid(true);
+  loadMotion(true);
 }
 
 function updateSlider(){
@@ -511,79 +510,44 @@ function updateSlider(){
   s.style.setProperty("--split", split + "%");
 }
 
-/* --- future frames --- */
-const RAMP = [[0.1,[136,221,238]],[0.5,[0,153,204]],[1.5,[0,85,136]],[4,[255,238,0]],[10,[255,136,0]],[25,[212,0,0]],[50,[255,102,255]]];
-function rampColor(v){
-  if(v <= RAMP[0][0]) return RAMP[0][1];
-  for(let i = 1; i < RAMP.length; i++){
-    if(v <= RAMP[i][0]){
-      const [a, ca] = RAMP[i - 1], [b, cb] = RAMP[i];
-      const t = (Math.log(v) - Math.log(a)) / (Math.log(b) - Math.log(a));
-      return [0,1,2].map(k => Math.round(ca[k] + (cb[k] - ca[k]) * t));
-    }
-  }
-  return RAMP[RAMP.length - 1][1];
-}
-function renderGrid(grid, N){
-  const W = 180, cv = document.createElement("canvas"); cv.width = cv.height = W;
-  const ctx = cv.getContext("2d"), img = ctx.createImageData(W, W), d = img.data;
-  for(let y = 0; y < W; y++){
-    const gy = y / (W - 1) * (N - 1), y0 = Math.floor(gy), y1 = Math.min(y0 + 1, N - 1), fy = gy - y0;
-    for(let x = 0; x < W; x++){
-      const gx = x / (W - 1) * (N - 1), x0 = Math.floor(gx), x1 = Math.min(x0 + 1, N - 1), fx = gx - x0;
-      const v = (grid[y0*N+x0] * (1-fx) + grid[y0*N+x1] * fx) * (1-fy) + (grid[y1*N+x0] * (1-fx) + grid[y1*N+x1] * fx) * fy;
-      const o = (y * W + x) * 4;
-      if(v < 0.1){ d[o+3] = 0; continue; }
-      const c = rampColor(v);
-      d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = v < 0.3 ? 110 + (v - 0.1) / 0.2 * 100 : 215;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return cv.toDataURL("image/png");
-}
-async function loadFutureGrid(force){
+/* --- future frames: the latest real radar image moved along the storm-steering wind --- */
+// Wind at 700 and 500 hPa (Open-Meteo, free) gives the direction and speed rain cells travel.
+// Each future frame is the newest radar frame shifted by that motion — same look as the radar itself.
+const fcPane = map.createPane("nowcast"); fcPane.style.zIndex = 401; fcPane.style.pointerEvents = "none";
+async function loadMotion(force){
   if(fc.loading) return;
-  const view = map.getBounds(), z = map.getZoom();
-  if(!force && fc.bounds && fc.bounds.contains(view) && Math.abs(fc.zoom - z) < 2 && Date.now() - fc.at < 15 * 60000) return;
+  const c = map.getCenter();
+  const far = fc.lat === null || Math.abs(c.lat - fc.lat) > 3 || Math.abs(c.lng - fc.lon) > 3;
+  if(!force && !far && Date.now() - fc.at < 30 * 60000) { buildFuture(); return; }
   fc.loading = true;
-  const b = view.pad(0.35), N = FC_GRID;
-  let s = Math.max(b.getSouth(), -80), n = Math.min(b.getNorth(), 80), w = b.getWest(), e = b.getEast();
-  if(e - w > 340){ w = -170; e = 170; }
-  const my = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
-  const iy = y => (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
-  const ys = my(s), yn = my(n), lats = [], lons = [];
-  for(let r = 0; r < N; r++){
-    const lat = iy(yn - (yn - ys) * r / (N - 1));          // even spacing on the Mercator map
-    for(let c = 0; c < N; c++){
-      const lon = ((w + (e - w) * c / (N - 1)) + 540) % 360 - 180;
-      lats.push(lat.toFixed(3)); lons.push(lon.toFixed(3));
-    }
-  }
   try{
-    const url = "https://api.open-meteo.com/v1/forecast?latitude=" + lats.join(",") + "&longitude=" + lons.join(",") +
-      "&minutely_15=precipitation&forecast_minutely_15=" + (FC_STEPS + 4) + "&timezone=GMT";
-    const j = await (await fetch(url)).json();
-    const arr = Array.isArray(j) ? j : [j];
-    if(arr.length !== N * N || !arr[0].minutely_15) throw new Error("grid");
-    const times = arr[0].minutely_15.time.map(t => Date.parse(t + "Z") / 1000);
-    const after = frames.length ? frames[frames.length - 1].time : Date.now() / 1000 - 600;
-    const out = [];
-    times.forEach((t, k) => {
-      if(t <= after || out.length >= FC_STEPS) return;
-      const grid = new Float32Array(N * N);
-      for(let p = 0; p < N * N; p++) grid[p] = (arr[p].minutely_15.precipitation[k] || 0) * 4;   // mm per 15 min -> mm/h
-      out.push({ time:t, url:renderGrid(grid, N) });
-    });
-    const wasFuture = idx >= frames.length;
-    fc.frames = out; fc.bounds = L.latLngBounds([s, w], [n, e]); fc.zoom = z; fc.at = Date.now();
-    if(fc.overlay){ map.removeLayer(fc.overlay); fc.overlay = null; }
-    updateSlider();
-    if(wasFuture || playing) showFrame(Math.min(idx, total() - 1));
-  }catch(err){}
+    const u = "https://api.open-meteo.com/v1/forecast?latitude=" + c.lat.toFixed(2) + "&longitude=" + c.lng.toFixed(2) +
+      "&hourly=wind_speed_700hPa,wind_direction_700hPa,wind_speed_500hPa,wind_direction_500hPa&forecast_hours=2&timezone=GMT";
+    const j = await (await fetch(u)).json(), H = j.hourly;
+    const vec = (s, d) => [-s * Math.sin(d * Math.PI / 180), -s * Math.cos(d * Math.PI / 180)];   // km/h toward east, north
+    const a7 = vec(H.wind_speed_700hPa[0], H.wind_direction_700hPa[0]), a5 = vec(H.wind_speed_500hPa[0], H.wind_direction_500hPa[0]);
+    fc.u = 0.6 * a7[0] + 0.4 * a5[0]; fc.v = 0.6 * a7[1] + 0.4 * a5[1];
+    fc.lat = c.lat; fc.lon = c.lng; fc.at = Date.now();
+  }catch(err){ fc.u = fc.v = 0; }
   fc.loading = false;
+  buildFuture();
+}
+function buildFuture(){
+  if(!frames.length){ fc.frames = []; updateSlider(); return; }
+  const last = frames[frames.length - 1].time;
+  fc.frames = Array.from({ length:FC_STEPS }, (_, k) => ({ time:last + (k + 1) * 600, k:k + 1 }));
+  updateSlider();
+  if(idx >= frames.length) showFrame(Math.min(idx, total() - 1));
+}
+function placeFuture(k){
+  const c = map.getCenter(), mins = k * 10;
+  const dLat = (fc.v * mins / 60) / 111, dLon = (fc.u * mins / 60) / (111 * Math.cos(c.lat * Math.PI / 180));
+  const p0 = map.latLngToLayerPoint(c), p1 = map.latLngToLayerPoint([c.lat + dLat, c.lng + dLon]);
+  fcPane.style.transform = "translate3d(" + (p1.x - p0.x) + "px," + (p1.y - p0.y) + "px,0)";
 }
 let moveTimer = null;
-map.on("moveend", () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => loadFutureGrid(false), 700); });
+map.on("moveend", () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => loadMotion(false), 700); });
+map.on("zoomend", () => { if(idx >= frames.length && fc.frames.length) placeFuture(fc.frames[idx - frames.length].k); });
 
 function showFrame(i){
   const n = total(); if(!n) return;
@@ -598,15 +562,23 @@ function showFrame(i){
       if(fc.overlay) fc.overlay.setOpacity(0);
     }else{
       Object.values(layers).forEach(l => l.setOpacity(0));
-      if(!fc.overlay) fc.overlay = L.imageOverlay(f.url, fc.bounds, { opacity, zIndex:400, interactive:false, className:"fc-img", attribution:"Open-Meteo" }).addTo(map);
-      else { fc.overlay.setUrl(f.url); fc.overlay.setOpacity(opacity); }
+      const lastF = frames[frames.length - 1];
+      if(!fc.overlay || fc.overlay._path !== lastF.path){
+        if(fc.overlay) map.removeLayer(fc.overlay);
+        fc.overlay = L.tileLayer(rv.host + lastF.path + "/512/{z}/{x}/{y}/" + RV_COLOR + "/" + RV_OPTS + ".png", {
+          tileSize:512, zoomOffset:-1, maxNativeZoom:8, maxZoom:12, pane:"nowcast", keepBuffer:3
+        });
+        fc.overlay._path = lastF.path; fc.overlay.addTo(map);
+      }
+      placeFuture(f.k);
+      fc.overlay.setOpacity(opacity * (1 - 0.07 * f.k));
     }
   }
   $("#slider").value = i;
   const t = new Date(f.time * 1000), mins = Math.round((t.getTime() - Date.now()) / 60000);
-  $("#tlTime").textContent = fmtClock(t);
+  $("#tlTime").textContent = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
   $(".ptime").classList.toggle("fut", future);
-  $("#tlAgo").textContent = future ? "توقع · بعد " + arNum(Math.max(mins, 5)) + " دقيقة"
+  $("#tlAgo").textContent = future ? "توقع · بعد " + arNum(f.k * 10) + " دقيقة من آخر رادار"
     : (i === frames.length - 1 ? "الآن · " : "") + "رادار · قبل " + arNum(Math.max(-mins, 0)) + " دقيقة";
 }
 
@@ -805,7 +777,7 @@ async function showTop(){
     d.innerHTML = '<span class="rk"></span><span class="nm"></span><span class="cnt"></span>';
     d.querySelector(".rk").textContent = arNum(i + 1);
     d.querySelector(".nm").textContent = x.c[0];
-    d.querySelector(".cnt").textContent = x.n.toLocaleString("ar-SA");
+    d.querySelector(".cnt").textContent = x.n.toLocaleString("en-US");
     d.onclick = () => { box.style.display = "none"; $("#q").blur(); $("#locBtn").classList.remove("on"); countSearch(x.c[1], x.c[2]); setPlace({ name:x.c[0], lat:x.c[1], lon:x.c[2] }, true); };
     box.appendChild(d);
   });
@@ -860,9 +832,9 @@ function renderNow(j){
   $("#nowT").textContent = arNum(Math.round(c.temperature_2m)) + "°";
   $("#nowD").textContent = (WMO[c.weather_code] || "—") + (c.precipitation > 0 ? " · " + arNum(c.precipitation) + " مم" : "");
   $("#sFeel").textContent = arNum(Math.round(c.apparent_temperature)) + "°";
-  $("#sHum").textContent = arNum(c.relative_humidity_2m) + "٪";
+  $("#sHum").textContent = arNum(c.relative_humidity_2m) + "%";
   $("#sWind").textContent = arNum(Math.round(c.wind_speed_10m));
-  $("#sCloud").textContent = arNum(c.cloud_cover) + "٪";
+  $("#sCloud").textContent = arNum(c.cloud_cover) + "%";
 }
 
 function renderNowcast(j){
@@ -885,7 +857,7 @@ function renderNowcast(j){
   }else{
     const hp = j.hourly.precipitation_probability, hs = Math.max(0, j.hourly.time.findIndex(t => t >= nowStr.slice(0, 13)));
     const next = hp.slice(hs, hs + 12), pk = Math.max(...next), pi = next.indexOf(pk);
-    if(pk >= 40) setAlert("dry", ICONS.clock, "لا مطر خلال ساعتين — احتمال " + arNum(pk) + "٪ بعد " + arNum(pi) + " ساعات");
+    if(pk >= 40) setAlert("dry", ICONS.clock, "لا مطر خلال ساعتين — احتمال " + arNum(pk) + "% بعد " + arNum(pi) + " ساعات");
     else setAlert("dry", ICONS.check, "لا مطر متوقع في " + place.name + " خلال الساعات القادمة");
   }
 }
@@ -897,7 +869,7 @@ function renderHours(j){
     const p = h.precipitation_probability[i];
     const el = document.createElement("div"); el.className = "h" + (i === s ? " cur" : "");
     el.innerHTML = "<small>" + (i === s ? "الآن" : fmtClock(new Date(h.time[i]), true)) + '</small><div class="e">' + icon(h.weather_code[i], h.is_day[i]) + "</div><b>" +
-      arNum(Math.round(h.temperature_2m[i])) + '°</b><div class="p">' + (p >= 10 ? arNum(p) + "٪" : "") + "</div>";
+      arNum(Math.round(h.temperature_2m[i])) + '°</b><div class="p">' + (p >= 10 ? arNum(p) + "%" : "") + "</div>";
     box.appendChild(el);
   }
   box.scrollLeft = 0;
@@ -913,7 +885,7 @@ function renderDays(j){
     el.innerHTML = "<span>" + (i === 0 ? "اليوم" : DAYS[dt.getDay()]) + '</span><div class="e">' + icon(d.weather_code[i], 1) + "</div>" +
       '<div class="rngw"><small>' + arNum(Math.round(d.temperature_2m_min[i])) + '°</small><div class="rng"><i style="left:' + a + "%;width:" + Math.max(5, b - a) + '%"></i></div><b>' +
       arNum(Math.round(d.temperature_2m_max[i])) + '°</b></div><span class="pp">' +
-      (p >= 10 ? arNum(p) + "٪" + (d.precipitation_sum[i] > 0 ? "<br>" + arNum(d.precipitation_sum[i].toFixed(1)) + " مم" : "") : "") + "</span>";
+      (p >= 10 ? arNum(p) + "%" + (d.precipitation_sum[i] > 0 ? "<br>" + arNum(d.precipitation_sum[i].toFixed(1)) + " مم" : "") : "") + "</span>";
     box.appendChild(el);
   });
 }
@@ -936,7 +908,7 @@ async function loadVisitors(){
     const j = r.status === 404 ? { value:0 } : (r.ok ? await r.json() : {});
     if(typeof j.value !== "number") return;
     if(mode === "hit") store.set("rr_counted", today);
-    $("#visitsN").textContent = j.value.toLocaleString("ar-SA");
+    $("#visitsN").textContent = j.value.toLocaleString("en-US");
     $("#visits").hidden = false;
   }catch(e){}
 }
